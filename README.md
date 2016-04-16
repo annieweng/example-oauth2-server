@@ -1,9 +1,7 @@
-This is an example of OAuth 2 Server.
 
-Find more details on http://lepture.com/en/2013/create-oauth-server
+OAuth 2 Server 
 
-#  OAuth 2 Server for dsra
-fork from lepture/example-oauth2-server
+fork from lepture/example-oauth2-server Find more details on http://lepture.com/en/2013/create-oauth-server
 use LADP to authenticate client in addition to client id/secret
 add redirect logic base on login status
 add registration page
