@@ -1,5 +1,5 @@
 # coding: utf-8
-
+from urlparse import urlparse
 from datetime import datetime, timedelta
 from flask import Flask
 from flask import session, request
@@ -7,27 +7,69 @@ from flask import render_template, redirect, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import gen_salt
 from flask_oauthlib.provider import OAuth2Provider
+#from flask.ext.sqlalchemy import SQLAlchemy
+#from flask.ext.login import LoginManager
+from sqlalchemy_utils.types.password import PasswordType
+from functools import wraps
+from flask import g, request, redirect, url_for
+import uuid
+import simpleldap
+import config
+import logging
+import sys
 
+# create logger
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 
+# create console handler and set level to debug
+ch = logging.StreamHandler(sys.stdout)
+ch.setLevel(logging.DEBUG)
+
+# create formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# add formatter to ch
+ch.setFormatter(formatter)
+
+# add ch to logger
+logger.addHandler(ch)
+
+#from views import auth
 app = Flask(__name__, template_folder='templates')
 app.debug = True
 app.secret_key = 'secret'
 app.config.update({
     'SQLALCHEMY_DATABASE_URI': 'sqlite:///db.sqlite',
 })
+app.config['WTF-CSRF_SECRET_KEY']=str(uuid.uuid4())
+
+app.config['APPLICATION_ROOT']='oauth'
+
 db = SQLAlchemy(app)
 oauth = OAuth2Provider(app)
+#conn = None
+conn = simpleldap.Connection(config.LDAP_PROVIDER)
 
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(40), unique=True)
+    password = db.Column(PasswordType(
+        schemes=[
+            'pbkdf2_sha512',
+            'md5_crypt'
+        ],
+
+        deprecated=['md5_crypt']
+    ))
 
 
 class Client(db.Model):
     client_id = db.Column(db.String(40), primary_key=True)
     client_secret = db.Column(db.String(55), nullable=False)
-
+    application_name=db.Column(db.Text)
+    application_url=db.Column(db.Text)
     user_id = db.Column(db.ForeignKey('user.id'))
     user = db.relationship('User')
 
@@ -118,49 +160,113 @@ class Token(db.Model):
 
 def current_user():
     if 'id' in session:
+    	print 'user id in session'
         uid = session['id']
         return User.query.get(uid)
     return None
 
+#target_url for_url('target') next_url is usually request.url
+def forwardNextUrl(target_url, next_url):
+    return'%s?next=%s' % (target_url, next_url)
 
-@app.route('/', methods=('GET', 'POST'))
+@app.route('/oauth/login', methods=('GET', 'POST'))       
+def login():
+	print 'in login request.ur'+request.url+' request.referrer '+request.referrer
+	msg=''
+	username = request.form.get('username')
+	password = request.form.get('password')
+	print(" querying database for matching username and password")
+	user = User.query.filter(username==username).filter(password==password).first()
+	if user:
+		print username+' is in database, getting client id, secret'+ ' userId: '+str(user.id)
+		session['id'] = user.id
+		client=Client.query.filter_by(user_id=user.id).first()
+		if client:
+			print 'client id/secret for user is '+client.client_id+' : '+client.client_secret
+			msg = msg + 'clientId: '+client.client_id+' client_secret:'+client.client_secret
+			#redirect the request back to next parameter of original request url, which is usually /authorize
+			next=urlparse(request.referrer).query
+			#request is coming from client, has ?next=url in the request, go ahead redirect back to the
+			#requester. 
+			if len(next)>5:
+				next_url=next[5:len(next)]
+				print 'query next:'+ str(next_url)
+				user = current_user()
+				return redirect(next_url)
+		else:
+			print 'there are currently no click id/secret associated with this user'
+			
+	else:
+		print username+' is not in database, querying ladp server'
+		is_valid = conn.authenticate('uid='+username+','+config.LDAP_BINDDN, password)
+		print " connection to ldap using username "+username+ " is valid: "+ str(is_valid)
+		if is_valid:
+			user = User(username=username, password=password)
+			db.session.add(user)
+			db.session.commit()
+			session['id'] = user.id
+			msg='login success!'
+			print ' user.id :' , user.id	
+		else:
+			msg='login failed'
+	user = current_user()
+	return render_template('home.html', user=user, msg=msg)
+	
+@app.route('/oauth', methods=('GET', 'POST'))
 def home():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        user = User.query.filter_by(username=username).first()
-        if not user:
-            user = User(username=username)
-            db.session.add(user)
-            db.session.commit()
-        session['id'] = user.id
-        return redirect('/')
-    user = current_user()
-    return render_template('home.html', user=user)
+	print 'in home request.url '+str(request.url)+' request.referrer '+str(request.referrer)
+	user = current_user()
+	return render_template('home.html', user=user)
 
-
-@app.route('/client')
-def client():
-    user = current_user()
-    if not user:
-        return redirect('/')
-    item = Client(
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+    	
+        if current_user() is None:
+        	print "login_required: url"+request.url
+    		print "login_required: redirect url"+ str(request.args.get("redirect_uri"))
+    		next_url = request.url
+    		login_url = '%s?next=%s' % (url_for('home'), next_url)
+    		return redirect(login_url)
+        return f(*args, **kwargs)
+    return decorated_function
+ 
+@login_required
+@app.route('/oauth/register', methods=('GET', 'POST'))
+def register():
+	user = current_user()
+	print 'in register user id', user.id
+	if request.method == 'GET':
+		return render_template('register.html', user=user)
+	if request.method == 'POST':
+		applicationName = request.form.get('applicationName')
+		applicationUrl = request.form.get('applicationUrl')
+		applcationDescription=request.form.get('applcationDescription')
+		applicationCallbackUrl=request.form.get('applicationCallbackUrl')
+		userId=request.form.get('userId')
+		item = Client(
         client_id=gen_salt(40),
         client_secret=gen_salt(50),
+        application_name=applicationName,
+        application_url=applicationUrl,
         _redirect_uris=' '.join([
-            'http://localhost:8000/authorized',
-            'http://127.0.0.1:8000/authorized',
-            'http://127.0.1:8000/authorized',
-            'http://127.1:8000/authorized',
+        	applicationCallbackUrl,
             ]),
         _default_scopes='email',
-        user_id=user.id,
-    )
-    db.session.add(item)
-    db.session.commit()
-    return jsonify(
+        user_id=userId,
+    	)
+		from pprint import pprint
+		pprint (vars(item))
+        db.session.add(item)
+        db.session.commit()
+        
+    	return jsonify(
         client_id=item.client_id,
         client_secret=item.client_secret,
-    )
+        )
+	
+
+	
 
 
 @oauth.clientgetter
@@ -225,36 +331,85 @@ def save_token(token, request, *args, **kwargs):
     return tok
 
 
+
 @app.route('/oauth/token', methods=['GET', 'POST'])
 @oauth.token_handler
 def access_token():
     return None
 
 
+@oauth.usergetter
+def get_user(username, password, *args, **kwargs):
+	print 'in get_user method'
+	user = User.query.filter_by(username=username).filter_by(password=password).first()
+	if user:
+		session['id'] = user.id
+		return user
+	else:
+		print username+' is not in database, querying ladp server'
+		is_valid = conn.authenticate('uid='+username+','+config.LDAP_BINDDN, password)
+		print " connection to ldap using username "+username+ " is valid: "+ str(is_valid)
+		if is_valid:
+			user = User(username=username, password=password)
+			db.session.add(user)
+			db.session.commit()
+			session['id'] = user.id
+			return user			
+		else:
+			return none
+    
+
+        
+
 @app.route('/oauth/authorize', methods=['GET', 'POST'])
+@login_required
 @oauth.authorize_handler
 def authorize(*args, **kwargs):
-    user = current_user()
-    if not user:
-        return redirect('/')
-    if request.method == 'GET':
-        client_id = kwargs.get('client_id')
-        client = Client.query.filter_by(client_id=client_id).first()
-        kwargs['client'] = client
-        kwargs['user'] = user
-        return render_template('authorize.html', **kwargs)
+	#print "redirect uri"+ str(request.arg.get("redirect_uri"))
+	user = current_user()
+	if user is None:
+		print ' in authorized, user is not defined, redirect to home url'
+		return redirect(url_for('home', next=url_for("authorize", next=request.url)))
+	if request.method == 'GET':
+		client_id = kwargs.get('client_id')
+		client = Client.query.filter_by(client_id=client_id).filter_by(user_id=user.id).first()
+		kwargs['client'] = client
+		kwargs['user'] = user
+		return render_template('authorize.html', **kwargs)
+	confirm = request.form.get('confirm', 'no')
+	return confirm == 'yes'
+	
 
-    confirm = request.form.get('confirm', 'no')
-    return confirm == 'yes'
+@app.route('/oauth/sign_in', methods=('GET', 'POST'))
+def sign_in_or_out():
+	print 'in sign_in or out'
+	user = current_user()
+	if user:
+		session.pop('id', None)
+		user = None
+		print 'sign out...'
+	return redirect(url_for('home'))
 
 
-@app.route('/api/me')
+@app.route('/oauth/api/me')
 @oauth.require_oauth()
 def me():
     user = request.oauth.user
     return jsonify(username=user.username)
+    
 
+@app.route('/oauth/api/user/<username>')
+@oauth.require_oauth()
+def user(username):
+	user = User.query.filter_by(username=username).first()
+	#todo: get the email from ladp
+	return jsonify(username=user.username)
+    
+    
+@app.route('/oauth2/revoke', methods=['POST'])
+@oauth.revoke_handler
+def revoke_token(): pass
 
 if __name__ == '__main__':
     db.create_all()
-    app.run()
+    app.run(debug=True, host='0.0.0.0')

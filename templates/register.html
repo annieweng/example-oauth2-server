@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DSRA Application Registration</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+</head>
+<body style="margin:30px">
+  <p>Register your application with DSRA oauth2 server</p>
+  
+  <form action="{{url_for("register")}}" method="post" >
+  
+    
+    
+<dl class="form-group"><dt class="input-label"><label autofocus="autofocus" class="wide" for="applicationName" tabindex="2">Application name</label></dt><dd><input autofocus="autofocus" class="form-control wide" id="applicationName" name="applicationName size="30" tabindex="2" type="text" /><p class="note">Something users will recognize and trust</p></dd></dl>
+
+<dl class="form-group"><dt class="input-label">
+<label class="wide" for="applicationUrl" tabindex="3">Homepage URL</label></dt>
+<dd><input class="form-control wide" id="applicationUrl" name="applcationUrl" size="30" tabindex="3" type="text" />
+<p class="note">The full URL to your application homepage</p></dd></dl>
+
+
+<dl class="form-group"><dt class="input-label"><label class="short" for="applicationDescription" placeholder="Application description is optional" tabindex="4">Application description</label></dt><dd><textarea class="form-control short" cols="20" id="applicationDescription" name="applicationDescription" placeholder="Application description is optional" rows="3" tabindex="4">
+</textarea><p class="note">This is displayed to all potential users of your application</p></dd></dl>
+
+<hr class="bleed-flush">
+
+
+<dl class="form-group"><dt class="input-label"><label class="wide" for="applicationCallbackUrl"  tabindex="5">Authorization callback URL</label></dt>
+<dd><input class="form-control wide" id="applicationCallbackUrl" name="applicationCallbackUrl" size="30" tabindex="5" type="text"  placeholder="http://application_url/authorized" />
+<p class="note">Your application’s callback URL</p></dd></dl>
+
+<input type="hidden" name="userId"  value="{{user.id}}">
+
+      <p><button type="submit" class="btn btn-primary" tabindex="5">Register application</button></p>
+
+</form>
+</body>
+</html>

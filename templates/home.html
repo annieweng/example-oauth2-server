@@ -2,19 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title></title>
+  <title>DSRA login </title>
 </head>
 <body>
   {% if user %}
-    <p>You are {{ user.username }}</p>
-  {% else %}
-    <p>You are not authenticated</p>
-  {% endif %}
-
-  <p>Type any username:</p>
-  <form method="post" action="/">
+    <p>welcome {{ user.username }} you have successfully login</p>
+    <p>{{msg}}</p>
+    <p> <a href={{url_for("register")}}> click here to register a application</a></p>
+   {% else %}
+   <p>{{msg}}</p>
+   
+    <p>Login user your VPN credential:</p>
+  <form method="post" action={{url_for("login")}}>
     <input type="text" name="username">
+    <input type="password" name="password">
     <input type="submit">
   </form>
+   {% endif %}
+  
+  
+ 
+
+ 
 </body>
 </html>
