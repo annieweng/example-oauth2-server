@@ -11,6 +11,7 @@ add registration page
 $ pip install -r requirements.txt
 python dbInit.py
 chmod 755 db.sqlite
+
 #if running within nginx, change permission of data to nginx 
 chown nginx:www-data db.sqlite
 
