@@ -1,5 +1,5 @@
 
-OAuth 2 Server 
+# OAuth 2 Server 
 
 fork from lepture/example-oauth2-server Find more details on http://lepture.com/en/2013/create-oauth-server
 use LADP to authenticate client in addition to client id/secret
