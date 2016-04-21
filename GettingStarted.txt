@@ -1,0 +1,61 @@
+Get Started:
+
+
+
+	1.	 	Register your application with your auth provide. Navigate to  https://xdataproxy.com/oauth or any other oauth2 provider.
+	login with your VPN credential, click on “register application” to start registering a application. at the end of registration, take a note of your client id/secret 
+	following is example value of register a python client that will be talking to oauth provider, 
+	client use this provider is available at https://gitlab.xdataproxy.com/aweng/dsra-oauth2-server.git
+	￼
+						HomePage URL: http://localhost:8000
+						Authorization Callback Url: http://localhost:8000/authorized
+					
+
+2. your client should point oauth provider 
+	
+	remote = oauth.remote_app(
+    'remote',
+    consumer_key=CLIENT_ID,
+    consumer_secret=CLIENT_SECRET,
+    request_token_params={'scope': 'email'},
+    base_url='https://xdataproxy.com/oauth/api/',
+    request_token_url=None,
+    access_token_url='https://xdataproxy.com/oauth/token',
+    authorize_url='https://xdataproxy.com/oauth/authorize'
+	)
+
+   and call oauth/authorize and register call back with authorized method
+	remote.authorize(callback=url_for('authorized', next=next_url, _external=True))
+	
+2. start your sample client at http://localhost:8000
+	git clone https://gitlab.xdataproxy.com/aweng/dsra-oauth2-server.git
+	cd dsra-oauth2-server
+	pip install -r requirements.txt
+	update your client id and secret in client.py
+	python client.py
+
+3. watch the magic happen
+	type in http://localhost:8000, this will redirect directly to auth2 provider with clientId, redirect-url and scope.  here is url will looks like:
+https://xdataproxy.com/oauth?next=https://xdataproxy.com/oauth/authorize?response_type=code&client_id=QYRoovUXCg6WAWLmaH7qfdOBhmnPRSwPvpHgwPrq&redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fauthorized&scope=email
+
+	 
+￼auth provider will authenticate your username and make sure client ID/secret pair are valid and registered in the database.  when the oauth authentication is complete, it will call your client’s callback.  it’s worth to point out that callback registered in your registration form have to match the callback method(http or https) exactly, otherwise, you will get a redirect url mismatch error.
+
+ in example client /authroized callback method, we simply invoke oauth2/api/me method that is protected by oauth server to demostrate that api can be called once user login.
+	me = remote.get('me')
+    return jsonify(me.data)
+
+here is what you will see upon success of authentication process:
+
+	{
+  "oauth_token": "tjbEkAoTCoZAL4HE9jQTzEvhOt50cI", 
+  "user": {
+    "username": "your user name"
+ 	 }
+	}
+￼
+
+
+
+you could also call the api directly like this, once the bearer token is obtain.
+curl -H "Authorization: Bearer dKrrZjhgBEQg50PBYZp7ZkyjxGxKlC" https://xdataproxy.com/oauth/api/me
