@@ -6,3 +6,4 @@ simpleldap>=0.8
 SQLAlchemy-Utils>=0.7.9
 passlib==1.6.5
 uwsgi==2.0.12
+oauthlib>=1.0.3

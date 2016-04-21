@@ -1,5 +1,6 @@
 from flask import Flask, url_for, redirect, session, request, jsonify
 from flask_oauthlib.client import OAuth
+from flask import render_template
 import logging
 import sys
 # create logger
@@ -19,8 +20,8 @@ ch.setFormatter(formatter)
 # add ch to logger
 logger.addHandler(ch)
 
-CLIENT_ID = 'CgPSlVTKyFrVhrZ8eiqZOt0KqF4NvF4NMGmRXTjV'
-CLIENT_SECRET = 'k3k03aYH4sOvLzIpKC1aFSbQTvlawp8IDWwB4O7t6fPO5LCLlv'
+CLIENT_ID = 'QYRoovUXCg6WAWLmaH7qfdOBhmnPRSwPvpHgwPrq'
+CLIENT_SECRET = 'FFLvsV9foMQ5quhlA0WFY8UVfzOHnTMY9lVE8YkqHBuGMijDlZ'
 #CLIENT_SECRET = 'test'
 
 app = Flask(__name__)
@@ -33,24 +34,25 @@ remote = oauth.remote_app(
     consumer_key=CLIENT_ID,
     consumer_secret=CLIENT_SECRET,
     request_token_params={'scope': 'email'},
-    base_url='http://127.0.0.1:5000/oauth/api/',
+    base_url='https://xdataproxy.com/oauth/api/',
     request_token_url=None,
-    access_token_url='http://127.0.0.1:5000/oauth/token',
-    authorize_url='http://127.0.0.1:5000/oauth/authorize'
+    access_token_url='https://xdataproxy.com/oauth/token',
+    authorize_url='https://xdataproxy.com/oauth/authorize'
 )
 
 
 @app.route('/')
 def index():
-    if 'remote_oauth' in session:
-        me = remote.get('me')
-        return jsonify(me.data)
+   
     return redirect(url_for('login'))
  
 @app.route('/logout')
 def logout():
+	if 'remote_oauth' in session:
+		remote.get('signout')
 	session.pop('remote_oauth', None)
-	return redirect(url_for('index'))
+	session.clear()
+	return render_template("logout.html")
 
 @app.route('/authorized')
 def authorized():
@@ -66,8 +68,9 @@ def authorized():
     session['remote_oauth'] = (resp['access_token'], '')
     #test getting protected api/me method
     me = remote.get('me')
-    return jsonify(me.data)
-    #return jsonify(oauth_token=resp['access_token'])
+    
+    return jsonify(oauth_token=resp['access_token'], user=me.data)
+    
 
 @app.route('/login')
 def login():
@@ -83,4 +86,4 @@ if __name__ == '__main__':
     import os
     os.environ['DEBUG'] = 'true'
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = 'true'
-    app.run(host='localhost', port=8000)
+    app.run(host='0.0.0.0', port=8000)

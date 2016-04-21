@@ -1,0 +1,2 @@
+LDAP_PROVIDER = 'ladp_ip'
+LDAP_BINDDN = 'cn=users,cn=accounts,dc=xdata,dc=data-tactics-corp,dc=com'
