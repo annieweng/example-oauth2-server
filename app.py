@@ -177,7 +177,7 @@ def login():
 	username = request.form.get('username')
 	password = request.form.get('password')
 	is_valid = conn.authenticate('uid='+username+','+config.LDAP_BINDDN, password)
-	logger.debug(" querying database for matching username and password %s, %s", username, password)
+	logger.debug(" querying database for matching username %s", username)
 	logger.debug(" connection to ldap using username "+username+ " is valid: "+ str(is_valid))
 	if is_valid:
 		user=User.query.filter_by(username=username).first()
@@ -185,15 +185,7 @@ def login():
 		if user:
 			logger.debug("user already in local database. setting session id to user.id %s", user.id)
 			session['id']=user.id
-			#redirect the request back to next parameter of original request url, which is usually /authorize
-			next=urlparse(request.referrer).query
-			#request is coming from client, has ?next=url in the request, go ahead redirect back to the
-			#requester. 
-			if len(next)>5:
-				next_url=next[5:len(next)]
-				print 'query next:'+ str(next_url)
-					
-				return redirect(next_url)
+			
 				
 					
 			client=Client.query.filter_by(user_id=user.id).first()
@@ -208,6 +200,15 @@ def login():
 			session['id'] = user.id
 			msg='login success!'
 			logger.debug( ' user.id :%s' , user.id)
+		user=current_user()	
+		#redirect the request back to next parameter of original request url, which is usually /authorize
+		next=urlparse(request.referrer).query
+		#request is coming from client, has ?next=url in the request, go ahead redirect back to the
+		#requester. 
+		if len(next)>5:
+			next_url=next[5:len(next)]
+			print 'query next:'+ str(next_url)		
+			return redirect(next_url)
 	else:
 		msg='login failed'
 	return render_template('home.html', user=user, msg=msg)
@@ -225,8 +226,8 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
     	
         if current_user() is None:
-        	logger.debug( "login_required: url"+request.url)
-    		logger.debug( "login_required: redirect url"+ str(request.args.get("redirect_uri")))
+        	logger.debug( "login_required: request url "+request.url)
+    		logger.debug( "login_required: redirect url "+ str(request.args.get("redirect_uri")))
     		next_url = request.url
     		login_url = '%s?next=%s' % (url_for('home'), next_url)
     		return redirect(login_url)
@@ -346,24 +347,22 @@ def access_token():
 @oauth.usergetter
 def get_user(username, password, *args, **kwargs):
 	print 'in get_user method'
-	user = User.query.filter_by(username=username).filter_by(password=password).first()
-	if user:
-		session['id'] = user.id
-		return user
-	else:
-		print username+' is not in database, querying ladp server'
-		is_valid = conn.authenticate('uid='+username+','+config.LDAP_BINDDN, password)
-		print " connection to ldap using username "+username+ " is valid: "+ str(is_valid)
-		if is_valid:
+	is_valid = conn.authenticate('uid='+username+','+config.LDAP_BINDDN, password)
+	if is_valid:
+		user=User.query.filter_by(username=username).first()
+		
+		if user:
+			session['id'] = user.id
+			return current_user()
+		else:
 			user = User(username=username, password=password)
 			db.session.add(user)
 			db.session.commit()
 			session['id'] = user.id
 			return user			
-		else:
-			return none
+	else:
+		return none
     
-
         
 
 @app.route('/oauth/authorize', methods=['GET', 'POST'])
@@ -418,5 +417,7 @@ def revoke_token(): pass
 
 if __name__ == '__main__':
     db.create_all()
-    app.run( host='0.0.0.0')
+    
+    app.run(host='0.0.0.0')
+    
 
