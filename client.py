@@ -3,6 +3,7 @@ from flask_oauthlib.client import OAuth
 from flask import render_template
 import logging
 import sys
+import config
 # create logger
 logger = logging.getLogger('oauth client')
 logger.setLevel(logging.DEBUG)
@@ -20,9 +21,6 @@ ch.setFormatter(formatter)
 # add ch to logger
 logger.addHandler(ch)
 
-CLIENT_ID = 'QYRoovUXCg6WAWLmaH7qfdOBhmnPRSwPvpHgwPrq'
-CLIENT_SECRET = 'FFLvsV9foMQ5quhlA0WFY8UVfzOHnTMY9lVE8YkqHBuGMijDlZ'
-#CLIENT_SECRET = 'test'
 
 app = Flask(__name__)
 app.debug = True
@@ -31,13 +29,13 @@ oauth = OAuth(app)
 
 remote = oauth.remote_app(
     'remote',
-    consumer_key=CLIENT_ID,
-    consumer_secret=CLIENT_SECRET,
+    consumer_key=config.CLIENT_ID,
+    consumer_secret=config.CLIENT_SECRET,
     request_token_params={'scope': 'email'},
-    base_url='https://xdataproxy.com/oauth/api/',
+    base_url=config.PROVIDER_BASE_URL,
     request_token_url=None,
-    access_token_url='https://xdataproxy.com/oauth/token',
-    authorize_url='https://xdataproxy.com/oauth/authorize'
+    access_token_url=config.PROVIDER_ACCESS_TOKEN_URL,
+    authorize_url=config.PROVIDER_AUTHORIZE_URL
 )
 
 
